@@ -444,6 +444,38 @@ else
       <span class="oi" aria-hidden="true"></span>@@CLASSNAME
    </NavLink>
 </li>
+
+===========================================================
+= You can put this CSS code on wwwroot/css/site.css if    =
+= you want some rudimentary styling for the generated html=
+===========================================================
+
+/* From Blazor/Dapper code generator */
+.genlist,
+.genform{
+    border-collapse:collapse;
+    margin: 1em auto;
+}
+.genlist th, .genlist td{
+    border: solid 1px silver;
+    padding: 2px 4px;
+}
+    .genlist td:first-child,
+    .genlist td:last-child{
+        text-align:center;
+    }
+
+.genform td {
+    border: solid 1px silver;
+    padding: 2px 4px;
+}
+.genform td:first-child{
+    font-weight:bold;
+    text-align:right;
+}
+.genform input[type="text"]{
+    min-width:300px;
+}
 =========================================================
 = If you want to use my images, copy the images folder  =
 = from the wwwroot in BlazorDapperGen to the wwwroot    =
