@@ -1,0 +1,454 @@
+
+=========================================================
+Things you need to do in Visual Studio 
+
+1. Create a Blazor Server project (https://youtu.be/XsCfaJCPnbI)
+
+2. Add Dapper and Microsoft.Data.SqlClient to the Solution (https://www.youtube.com/watch?v=VeCjL9JwPBM)
+
+3. Create your Database (https://youtu.be/RkzRci8SNCw)
+
+4. Add the correct connectionstring to appsettings.json (see https://www.youtube.com/watch?v=5XyPWMayg2Q)
+
+"ConnectionStrings":{
+     "SqlDBcontext" : "Your connection string here"
+}
+
+
+
+=========================================================
+= Stored procedures go in the database, not the app.    =
+=========================================================
+-------------- Stored Proc for INSERT
+CREATE PROCEDURE sp@@CLASSNAME_Insert
+--Parameters for Insert stored procedure
+@@spInsertParams
+AS
+BEGIN
+--SQL for Insert stored procedure
+@@SQLINSERT
+END
+
+--------------  Stored Proc for SELECT (all)
+CREATE PROCEDURE sp@@CLASSNAME_GetAll
+--No parameters required.
+AS
+BEGIN
+--SQL for Select stored procedure.
+@@SQLSELECTALL
+END
+
+--------------  Stored Proc for SELECT (one)
+CREATE PROCEDURE sp@@CLASSNAME_GetOne
+-- Needs one parameter for primary key
+@@@PK int
+AS 
+BEGIN
+-- SQL Select for one table row
+@@SQLSELECTONE
+END
+
+--------------  Stored Proc for UPDATE
+CREATE PROCEDURE sp@@CLASSNAME_Update
+-- Parameters for Update stored procedure.
+@@spAllParams
+AS
+BEGIN
+-- SQL for Update stored procedure
+@@SQLUPDATE
+END
+
+--------------  Stored Proc for DELETE
+CREATE PROCEDURE sp@@CLASSNAME_Delete
+-- One parameter required to identify row to delete.
+@@@PK int
+AS
+BEGIN
+-- SQL for Delete stored procedure (physically deletes, you may want to change this to mark inactive)
+@@SQLDELETE
+END
+
+=========================================================
+=  DATA folder files                                    =
+=========================================================
+
+---------------------------- /DATA/SqlConnectionConfiguration.cs
+namespace @@NAMESPACE.Data
+{
+    // Connection to SQL Server database, used within Data subfolder.
+    // You need to set the connection string in appsettings.json and configure Startup.cs yourself.
+    // In startup.cs add the following with the connectionstring name from appsettings.json inplace of YOURCONNECTIONNAME.
+    //  var sqlConnectionConfiguration = new SqlConnectionConfiguration(Configuration.GetConnectionString("YOURCONNECTIONNAME"));
+    //  services.AddSingleton(sqlConnectionConfiguration);
+    public class SqlConnectionConfiguration
+    {
+        public SqlConnectionConfiguration(string value) => Value = value;
+        public string Value { get; }
+    }
+
+}
+
+---------------------------- /DATA/@@CLASSNAME.cs
+using System;
+// This is the model for one row in the database table. You may need to make some adjustments.
+// You can use System.ComponentModel.DataAnnotations if you're familiar.
+namespace @@NAMESPACE.Data
+{
+    public class @@CLASSNAME
+    {
+	@@MODELCODE
+    }
+}
+
+---------------------------- /DATA/@@CLASSNAMEService.cs
+// This is the service for the @@CLASSNAME class.
+using Dapper;
+using Microsoft.Data.SqlClient;
+using System.Collections.Generic;
+using System.Data;
+using System.Threading.Tasks;
+
+namespace @@NAMESPACE.Data
+{
+    public class @@CLASSNAMEService : I@@CLASSNAMEService
+    {
+        // Database connection
+        private readonly SqlConnectionConfiguration _configuration;
+        public @@CLASSNAMEService(SqlConnectionConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
+
+        // Add (create) a @@CLASSNAME table row (SQL Insert)
+        // This only works if you're already created the stored procedure.
+        public async Task<bool> @@CLASSNAMEInsert(@@CLASSNAME @@objectname)
+        {
+            using (var conn = new SqlConnection(_configuration.Value))
+            {
+                var parameters = new DynamicParameters();
+			@@PARAMETERSADD
+                // Stored procedure method
+                await conn.ExecuteAsync("sp@@CLASSNAME_Insert", parameters, commandType: CommandType.StoredProcedure);
+            }
+            return true;
+        }     
+
+        // Get a list of @@objectname rows (SQL Select)
+        // This only works if you're already created the stored procedure.
+        public async Task<IEnumerable<@@CLASSNAME>> @@CLASSNAMEList()
+        {
+            IEnumerable<@@CLASSNAME> @@objectlist;
+            using (var conn = new SqlConnection(_configuration.Value))
+            {
+                @@objectlist = await conn.QueryAsync<@@CLASSNAME>("sp@@CLASSNAME_GetAll", commandType: CommandType.StoredProcedure);
+            }
+            return @@objectlist;
+        }
+
+        // Get one @@objectname based on its @@CLASSNAMEID (SQL Select)
+        // This only works if you're already created the stored procedure.
+        public async Task<@@CLASSNAME> @@CLASSNAME_GetOne(int @@@PK)
+        {
+            @@CLASSNAME @@objectname = new @@CLASSNAME();
+            var parameters = new DynamicParameters();
+            parameters.Add("@@@PK", @@PK, DbType.Int32);
+            using (var conn = new SqlConnection(_configuration.Value))
+            {
+                @@objectname = await conn.QueryFirstOrDefaultAsync<@@CLASSNAME>("sp@@CLASSNAME_GetOne",parameters,commandType: CommandType.StoredProcedure);
+            }
+            return @@objectname;
+        }
+
+        // Update one @@CLASSNAME row based on its @@CLASSNAMEID (SQL Update)
+        // This only works if you're already created the stored procedure.
+        public async Task<bool> @@CLASSNAMEUpdate(@@CLASSNAME @@objectname)
+        {
+            using (var conn = new SqlConnection(_configuration.Value))
+            {
+                var parameters = new DynamicParameters();
+                @@PARAMETERADDUPDATEONLY
+			    @@PARAMETERSADD
+                await conn.ExecuteAsync("sp@@CLASSNAME_Update", parameters, commandType: CommandType.StoredProcedure);
+            }
+            return true;
+        }
+
+        // Physically delete one @@CLASSNAME row based on its @@CLASSNAMEID (SQL Delete)
+        // This only works if you're already created the stored procedure.
+        public async Task<bool> @@CLASSNAMEDelete(int @@PK)
+        {
+            var parameters = new DynamicParameters();
+            parameters.Add("@@@PK", @@PK, DbType.Int32);
+            using (var conn = new SqlConnection(_configuration.Value))
+            {
+                await conn.ExecuteAsync("sp@@CLASSNAME_Delete",parameters, commandType: CommandType.StoredProcedure);
+            }
+            return true;
+        }
+    }
+}
+
+---------------------------- /Data/I@@CLASSNAMEService.cs
+// This is the @@CLASSNAME Interface
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace @@NAMESPACE.Data
+{
+    // Each item below provides an interface to a method in @@CLASSNAMEServices.cs
+    public interface I@@CLASSNAMEService
+    {
+        Task<bool> @@CLASSNAMEInsert(@@CLASSNAME @@objectname);
+        Task<IEnumerable<@@CLASSNAME>> @@CLASSNAMEList();
+        Task<@@CLASSNAME> @@CLASSNAME_GetOne(int @@PK);
+        Task<bool> @@CLASSNAMEUpdate(@@CLASSNAME @@objectname);
+        Task<bool> @@CLASSNAMEDelete(int @@PK);
+    }
+}
+
+=========================================================
+= Database connection and service - goes in Startup.cs  =
+=========================================================
+--------------------- At the top of Startup.cs add the following (if it's not already there)
+
+using @@NAMESPACE.Data;
+
+-------------------- Then in Startup.cs replace services.AddSingleton<WeatherForecastService>(); 
+-------------------- with the lines below. Note that the name sqlDBcontext has to match the name
+-------------------- that you actually provided in appsetting.json or it won't work.
+
+services.AddScoped<I@@CLASSNAMEService, @@CLASSNAMEService>();
+
+//SQL database connection (name defined in appsettings.json)
+var SqlConnectionConfiguration = new SqlConnectionConfiguration(Configuration.GetConnectionString("SqlDBcontext"));
+
+services.AddSingleton(SqlConnectionConfiguration);
+//Optional for debugging
+services.AddServerSideBlazor(o => o.DetailedErrors = true);
+
+
+
+=========================================================
+= Razor components that go in the PAGES folder          =                                             
+=========================================================
+
+---------------------------- /PAGES/@@CLASSNAMEAddEdit.razor
+
+@using @@NAMESPACE.Data
+@page "/@@OBJECTNAMEaddedit/{@@PK:int}"
+@inject I@@CLASSNAMEService @@CLASSNAMEService
+@inject NavigationManager NavigationManager
+@*Okay to use DataAnnotationsValidator and ValidationSummary here, if you like. See...
+    https://docs.microsoft.com/en-us/aspnet/core/blazor/forms-validation?view=aspnetcore-3.1*@
+
+<h1>@pagetitle</h1>
+
+<EditForm Model="@@@objectname" OnValidSubmit="@@@CLASSNAMESave">
+    <table class="genform">
+        <!-- You may want to change some type="" choices to better suit your own data -->
+        @@INPUTONEROWS
+        <tr>
+            <td colspan="2" style="text-align:center">
+                <input type="submit" value="@buttontext" />
+                <input type="button" value="Cancel" @onclick="@Cancel" />
+            </td>
+        </tr>
+    </table>
+</EditForm>
+
+@code {
+            // Create a new, empty @@CLASSNAME object
+@@CLASSNAME @@objectname = new @@CLASSNAME();
+
+    [Parameter]
+    public int @@PK { get; set; }
+
+    // Set default page title and button text
+    public string pagetitle = "Add a @@CLASSNAME";
+    public string buttontext = "Add";
+
+    //Executes on page open, set defaults on page.
+    protected override async Task OnInitializedAsync()
+    {
+        // ============ If the passed-in @@PK is zero, assume new @@CLASSNAME.
+        if (@@PK == 0)
+        {
+            // Use this block to set for defaults (optional)
+        }
+        else
+        {
+            @@objectname = await @@CLASSNAMEService.@@CLASSNAME_GetOne(@@PK);
+            // Change page title and button text since this is an edit.
+            pagetitle = "Edit @@CLASSNAME";
+            buttontext = "Update";
+        }
+    }
+    // Executes OnValidSubmit of EditForm above.
+    protected async Task @@CLASSNAMESave()
+    {
+        if (@@objectname.@@PRIMARYKEY == 0)
+        {
+            // Insert if @@PK is zero.
+            await @@CLASSService.@@CLASSNAMEInsert(@@objectname);
+        }
+        else
+        {
+            // Update if @@PK not 0
+            await @@CLASSService.@@CLASSNAMEUpdate(@@objectname);
+        }
+        NavigationManager.NavigateTo("/@@listpagename");
+    }
+    //Executes if user clicks the Cancel button.
+    void Cancel()
+    {
+        NavigationManager.NavigateTo("/@@listpagename");
+    }
+}
+
+---------------------------- /PAGES/@@CLASSNAMEList.razor
+
+@using @@NAMESPACE.Data
+@page "/@@LISTPAGENAME"
+@inject I@@CLASSNAMEService @@CLASSNAMEService
+
+<h3>@@CLASSNAME List</h3>
+<p style="text-align:center">
+    <!-- Calling @@objectnameaddedit with @@PK of zero configures page for Insert -->
+    <a href="/@@OBJECTNAMEaddedit/0"><span class="oi oi-plus"></span>Add a @@CLASSNAME</a>
+</p>
+@if (@@objectlist == null)
+{
+    <p style="text-align:center">
+        <img src="../images/loader.gif" />
+    </p>
+}
+else
+{
+    <table class="genlist">
+        <tr>
+            <th>Edit</th>
+		@@FIELDNAMESTABLEHEADING
+            <th>Delete</th>
+        </tr>
+        @foreach (var @@objectname in @@objectlist)
+        {
+    <tr>
+        <td>
+            <!-- Calling @@objectnameaddedit with @@PK configures page for Update of that table row -->
+            <a href="@@objectnameaddedit/@@@objectname.@@PRIMARYKEY">
+                <span class="oi oi-pencil" style="color:blue;"></span>
+                <!-- If you prefer images, comment below and put images in wwwroot/images folder 
+                <img src="../images/iEdit.png" />-->
+            </a>
+        </td>
+		@@FIELDNAMESTABLEROW
+        <!-- If you want to use a checkmark for a IsActive field, here's the basic code  -->
+        <!-- You have to uncomment and get the field name right -->
+        <!-- <td> -->
+            <!-- Provide your own images in wwwroot/images folder -->
+       <!--     @*Show a green check for active @@objectname...*@ -->
+       <!--     @if (@@objectname.IsActive) -->
+       <!--     { -->
+       <!--     <span class="oi oi-check" style="color:green;"></span> -->
+            <!-- If you prefer images, comment below and put images in wwwroot/images folder 
+       <!--         <img src="../images/iGreenCheck.png" /> -->
+       <!--     } -->
+       <!--     @* ...a red X otherwise *@ -->
+       <!--     else -->
+       <!--     { -->
+       <!--    <span class="oi oi-x" style="color:red;"></span> -->
+       <!--      If you prefer images, comment below and put images in wwwroot/images folder -->
+       <!--         <img src="../images/iRedX.png" />-->
+       <!--     }-->
+       <!-- </td>-->
+        @* This column for deletes *@
+        
+        <td>
+            <a href="@@objectnamedelete/@@@objectname.@@PRIMARYKEY">
+            <span class="oi oi-trash" style="color:red;"></span>
+            <!-- If you prefer images, uncomment the img tag and put images in wwwroot/images
+                <img src="../images/iTrash.png" alt="Delete" title="Delete" /> -->
+            </a>
+        </td>
+    </tr>
+        }
+    </table>
+}
+
+@code {
+    // Create an empty list, named @@objectlist, of empty @@CLASSNAME objects.
+    IEnumerable<@@CLASSNAME> @@objectlist;
+    protected override async Task OnInitializedAsync()
+    {
+        //Populate the list of @@objectname objects from the @@CLASSNAME table.
+        @@objectlist = await @@CLASSNAMEService.@@CLASSNAMEList();
+    }
+}
+
+
+---------------------------- /Pages/@@CLASSNAMEDelete.razor
+
+@using @@NAMESPACE.Data
+@page "/@@OBJECTNAMEdelete/{@@PK:int}"
+@inject I@@CLASSNAMEService @@CLASSService
+@inject NavigationManager NavigationManager
+
+
+<h1>Delete a @@CLASSNAME</h1>
+<p style="color:red;text-align:center">Are you sure you want to permanently delete this @@objectname? There is no undo!</p>
+
+<table class="genform">
+	@@CONFIRMDELETEROWS
+    <tr>
+        <td colspan="2" style="text-align:center">
+            <input type="button" value="Delete" @onclick="@Delete" />
+            <input type="button" value="Cancel" @onclick="@Cancel" />
+        </td>
+    </tr>
+</table>
+
+@code {
+    // Create a new, empty @@CLASSNAME object
+    @@CLASSNAME @@objectname = new @@CLASSNAME();
+
+    [Parameter]
+    public int @@PK { get; set; }
+
+    //Executes on page open..
+    protected override async Task OnInitializedAsync()
+    {
+        @@objectname = await @@CLASSNAMEService.@@CLASSNAME_GetOne(@@PK);
+    }
+    //Executes if user confirms the deletion.
+    protected async Task Delete()
+    {
+        // Delete the row and go back to the list.
+        await @@CLASSNAMEService.@@CLASSNAMEDelete(@@PK);
+        NavigationManager.NavigateTo("/@@listpagename");
+    }
+    // Executes when user clicks the Cancel button.
+    void Cancel()
+    {
+        NavigationManager.NavigateTo("/@@listpagename");
+    }
+}
+
+=========================================================
+=Link to the page that lists items, which should have links 
+= for adding editing and deleting. I made it match the code
+= in NavMenu.cs but of course you can style links 
+= however you like.
+=========================================================
+<li class="nav-item px-3">
+   <NavLink class="nav-link" href="@@LISTPAGENAME" Match="NavLinkMatch.All">
+      <span class="oi" aria-hidden="true"></span>@@CLASSNAME
+   </NavLink>
+</li>
+=========================================================
+= If you want to use my images, copy the images folder  =
+= from the wwwroot in BlazorDapperGen to the wwwroot    =
+= folder in your own project.                           =
+=========================================================
+===============================================================================
+End of generated code.
+===============================================================================
