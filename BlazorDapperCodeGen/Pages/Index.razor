@@ -79,6 +79,10 @@
         char[] a = tablename.ToCharArray();
         a[0] = char.ToUpper(a[0]);
         string classname = new string(a);
+        if (classname.Substring(0, 3) == "Tbl")
+        {
+            classname = classname.Substring(3);
+        }
         string classservice = classname + "Service";
         string objectname = classname.ToLower();
         string listpagename = objectname + "list";
@@ -120,6 +124,7 @@
             if (working.Length > 0)
             {
                 string sfldname = working.Substring(1, working.IndexOf("]") - 1);
+                sfldname = char.ToUpper(sfldname[0]) + sfldname.Substring(1);
                 // Table headings (td tags) - don't show first field (primary key)
                 if (iCounter > 1)
                 {
