@@ -1,4 +1,4 @@
-﻿@using System;
+@using System;
 @using BlazorDapperCodeGen.Data
 @using Pluralize.NET.Core
 @using System.Collections.Generic
@@ -57,9 +57,8 @@
 </p>
 
 
-@code{
-    Codetemplate codetemplate = new Codetemplate();
-    string tablename, primaryKey, sqlfieldsinsert1, sqlfieldsinsert2, sqlfieldsupdate, modelfield, parametersadd, inputtag, sqldelete, sqlselectall, sqlselectone, sqlinsert, sqlupdate;
+@code{ Codetemplate codetemplate = new Codetemplate();
+    string tablename, primaryKey, sqlfieldsinsert1, sqlfieldsinsert2, sqlfieldsupdate, modelfield, parametersadd, inputtag, sqldelete, sqlselectall, sqlselectone, sqlinsert, sqlupdate, sqlsearch;
     public string rawtemplate = System.IO.File.ReadAllText(@"BlazorDapperTemplate.txt");
     public void generate()
     {
@@ -169,9 +168,19 @@
         string sproc_oneparam = "";
         string sproc_allparams = "";
         string sproc_insertparams = "";
+        string cappedType = "";
+
 
         foreach (Tablefield fld in fieldlist)
         {
+            if (fld.IsRequired)
+            {
+                modelfield += "[Required]\n";
+            }
+            if (fld.Length > 0)
+            {
+                modelfield += "[StringLength(" + fld.Length + ")]\n";
+            }
             modelfield += "public " + fld.Codetype + " " + fld.Fieldname + " { get; set; }\n";
             sproc_allparams += "@" + fld.Fieldname + " " + fld.SQLtype + ",\n";
             // The first field is assumed to be the key, so we don't include that on paramters for Insert sproc
@@ -190,41 +199,75 @@
                 sqlselectone = "SELECT " + primaryKey;
                 sqlinsert = "INSERT INTO " + tablename + "(";
                 sqlupdate = "UPDATE " + tablename + " SET ";
+                sqlsearch = "SELECT * FROM " + tablename + " WHERE ";
             }
 
             // ===================================================================================================== Input tags for adding and editing, never the primary key.
             if (iCounter > 1)
             {
                 parametersadd += "parameters.Add(" + Convert.ToChar(34) + fld.Fieldname + Convert.ToChar(34) + ", " + objectname + "." + fld.Fieldname + ", DbType." + fld.DBtype + ");\n";
-                inputtag += "<tr><td>" + fld.Fieldname + ":</td><td><input type=" + Convert.ToChar(34) + TypeMapper.GetHtmlType(fld.Codetype) + Convert.ToChar(34) + " @bind=" + Convert.ToChar(34) + objectname + "." + fld.Fieldname + Convert.ToChar(34);
-                if (TypeMapper.GetHtmlType(fld.Codetype) == "date")
+                //inputtag += "<tr><td>" + fld.Fieldname + ":</td><td><input type=" + Convert.ToChar(34) + TypeMapper.GetHtmlType(fld.Codetype) + Convert.ToChar(34) + " @bind=" + Convert.ToChar(34) + objectname + "." + fld.Fieldname + Convert.ToChar(34);
+                cappedType = TypeMapper.GetHtmlType(fld.Codetype);
+                cappedType = char.ToUpper(cappedType[0]) + cappedType.Substring(1);
+                //If the data type in SQL is Text, then use TextArea rather than Input'
+                if (fld.SQLtype == "text") {
+                    cappedType = "TextArea";
+                }
+                inputtag += "<tr><td><label for = '" + fld.Fieldname + "'>" + fld.Fieldname + ":</label></td><td>\n<Input" + cappedType + " @bind-Value = " + Convert.ToChar(34) + objectname + "." + fld.Fieldname + Convert.ToChar(34) + " class='form-control'";
+                //The date ranges don't work in the model, so adding here.
+                if (fld.SQLtype.Contains("date"))
                 {
                     inputtag += " min=" + Convert.ToChar(34) + "1753-01-01" + Convert.ToChar(34) + " max=" + Convert.ToChar(34) + "9999-12-31" + Convert.ToChar(34);
                 }
-                if (fld.Length > 0)
-                {
-                    inputtag += " maxlength=" + fld.Length.ToString();
-                }
-                if (fld.Codetype == "decimal")
-                {
-                    inputtag += " step=" + Convert.ToChar(34) + "any" + Convert.ToChar(34);
-                }
-                if (fld.IsRequired)
-                {
-                    inputtag += " required ";
-                }
-                inputtag += "></td></tr>";
-                confirmdeleterows += "<tr><td>" + fld.Fieldname + "</td><td>@" + objectname + "." + fld.Fieldname + "</td></tr>\n";
+
+                inputtag += "/></td></tr>\n";
+
+                //if (TypeMapper.GetHtmlType(fld.Codetype) == "date")
+                //{
+                //    inputtag += " min=" + Convert.ToChar(34) + "1753-01-01" + Convert.ToChar(34) + " max=" + Convert.ToChar(34) + "9999-12-31" + Convert.ToChar(34);
+                //}
+                //if (fld.Length > 0)
+                //{
+                //    inputtag += " maxlength=" + fld.Length.ToString();
+                //}
+                //if (fld.Codetype == "decimal")
+                //{
+                //    inputtag += " step=" + Convert.ToChar(34) + "any" + Convert.ToChar(34);
+                //}
+                //if (fld.IsRequired)
+                //{
+                //    inputtag += " required ";
+                //}
+                //inputtag += "></td></tr>";
+                confirmdeleterows += "<tr><td>" + fld.Fieldname + ":</td><td>@" + objectname + "." + fld.Fieldname + "</td></tr>\n";
 
                 sqlselectall += ", " + fld.Fieldname;
                 sqlselectone += ", " + fld.Fieldname;
                 sqlfieldsinsert1 += fld.Fieldname + ", ";
                 sqlfieldsinsert2 += "@" + fld.Fieldname + ", ";
                 sqlupdate += fld.Fieldname + " = @" + fld.Fieldname + ", ";
+                //convert dates to string for Like search
+                if (fld.SQLtype.Contains("date"))
+                {
+                    //sqlsearchflds += "CONVERT(varchar(12)," + fld.Fieldname + ",101) AS " + fld.Fieldname + ", ";
+                    sqlsearch += "CONVERT(varchar(12)," + fld.Fieldname + ",101) LIKE + '%' + @param + '%' OR ";
+                }
+                //convert numbers to string for like search
+                if (fld.SQLtype.Contains("int") || fld.SQLtype.Contains("decimal") || fld.SQLtype.Contains("money"))
+                {
+                    //sqlsearchflds += "CAST(" + fld.Fieldname + " AS varchar(20)) AS " + fld.Fieldname + ",";
+                    sqlsearch += "CAST(" + fld.Fieldname + " AS varchar(20)) LIKE '%' + @param + '%' OR ";
+                }
+                //No convertsion for text fields
+                if (fld.SQLtype.Contains("text") || fld.SQLtype.Contains("char"))
+                {
+                    //sqlsearchflds += fld.Fieldname + ",";
+                    sqlsearch += fld.Fieldname + " LIKE '%' + @param + '%' OR ";
+                }
             }
             iCounter += 1;
         }
-        sproc_allparams = sproc_allparams.Substring(0,sproc_allparams.Length-2);
+        sproc_allparams = sproc_allparams.Substring(0, sproc_allparams.Length - 2);
         sproc_insertparams = sproc_insertparams.Substring(0, sproc_insertparams.Length - 2);
         rawtemplate = rawtemplate.Replace("@@PK", primaryKey);
         rawtemplate = rawtemplate.Replace("@@spOneParam", sproc_oneparam);
@@ -249,6 +292,8 @@
         sqlselectone += " FROM " + tablename + " WHERE " + primaryKey + "= @" + primaryKey;
         rawtemplate = rawtemplate.Replace("@@SQLINSERT", sqlinsert);
         rawtemplate = rawtemplate.Replace("@@SQLUPDATE", sqlupdate);
+
+        rawtemplate = rawtemplate.Replace("@@SQLSEARCH", sqlsearch.Substring(0, sqlsearch.Length-4));
         rawtemplate = rawtemplate.Replace("@@SQLSELECTALL", sqlselectall);
         rawtemplate = rawtemplate.Replace("@@SQLSELECTONE", sqlselectone);
         rawtemplate = rawtemplate.Replace("@@SQLDELETE", sqldelete);
@@ -265,6 +310,4 @@
     public string RemoveAlpha(string input)
     {
         return Regex.Replace(input, @"[^0-9.]", string.Empty);
-    }
-
-}
+    } }
