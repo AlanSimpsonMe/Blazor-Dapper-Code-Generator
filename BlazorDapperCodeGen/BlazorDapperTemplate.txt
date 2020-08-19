@@ -48,6 +48,19 @@ BEGIN
 @@SQLSELECTONE
 END
 
+
+--------------  Stored Proc for Search. This one is really a wild guess.
+--------------  You may need to re-do this one for realistic searches.
+CREATE PROCEDURE sp@@CLASSNAME_Search
+-- One parameter required to identify row to delete.
+@Param varchar(128)
+AS
+BEGIN
+-- SQL for search looking for embedded content. 
+@@SQLSEARCH 
+END
+
+
 --------------  Stored Proc for UPDATE
 CREATE PROCEDURE sp@@CLASSNAME_Update
 -- Parameters for Update stored procedure.
@@ -90,8 +103,8 @@ namespace @@NAMESPACE.Data
 
 ---------------------------- /DATA/@@CLASSNAME.cs
 using System;
+using System.ComponentModel.DataAnnotations;
 // This is the model for one row in the database table. You may need to make some adjustments.
-// You can use System.ComponentModel.DataAnnotations if you're familiar.
 namespace @@NAMESPACE.Data
 {
     public class @@CLASSNAME
@@ -141,6 +154,19 @@ namespace @@NAMESPACE.Data
             using (var conn = new SqlConnection(_configuration.Value))
             {
                 @@objectlist = await conn.QueryAsync<@@CLASSNAME>("sp@@CLASSNAME_GetAll", commandType: CommandType.StoredProcedure);
+            }
+            return @@objectlist;
+        }
+
+        	//Search for data (very generic...you may need to adjust.
+        public async Task<IEnumerable<@@CLASSNAME>> @@CLASSNAMESearch(string @Param)
+        {
+            var parameters = new DynamicParameters();
+            parameters.Add("@Param", Param, DbType.String);
+            IEnumerable<@@CLASSNAME> @@objectlist;
+            using (var conn = new SqlConnection(_configuration.Value))
+            {
+                @@objectlist = await conn.QueryAsync<@@CLASSNAME>("sp@@CLASSNAME_Search", parameters, commandType: CommandType.StoredProcedure);
             }
             return @@objectlist;
         }
@@ -200,6 +226,7 @@ namespace @@NAMESPACE.Data
     {
         Task<bool> @@CLASSNAMEInsert(@@CLASSNAME @@objectname);
         Task<IEnumerable<@@CLASSNAME>> @@CLASSNAMEList();
+        Task<IEnumerable<@@CLASSNAME>> @@CLASSNAMESearch(string Param);
         Task<@@CLASSNAME> @@CLASSNAME_GetOne(int @@PK);
         Task<bool> @@CLASSNAMEUpdate(@@CLASSNAME @@objectname);
         Task<bool> @@CLASSNAMEDelete(int @@PK);
@@ -241,18 +268,22 @@ services.AddServerSideBlazor(o => o.DetailedErrors = true);
 @*Okay to use DataAnnotationsValidator and ValidationSummary here, if you like. See...
     https://docs.microsoft.com/en-us/aspnet/core/blazor/forms-validation?view=aspnetcore-3.1*@
 
-<h1>@pagetitle</h1>
+<h1 style="text-align:center">@pagetitle</h1>
 
 <EditForm Model="@@@objectname" OnValidSubmit="@@@CLASSNAMESave">
-    <table class="genform">
+<table class="genform">
         <!-- You may want to change some type="" choices to better suit your own data -->
         @@INPUTONEROWS
-        <tr>
-            <td colspan="2" style="text-align:center">
-                <input type="submit" value="@buttontext" />
-                <input type="button" value="Cancel" @onclick="@Cancel" />
-            </td>
-        </tr>
+            <tr><td colspan="2">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    </td></tr>
+         <tr>
+         <td colspan="2" style="text-align:center">
+                <button class="btn btn-primary">@buttontext</button>
+                <button class="btn btn-secondary" @onclick="@Cancel">Cancel</button>
+    </td></tr>
+
     </table>
 </EditForm>
 
@@ -311,11 +342,22 @@ services.AddServerSideBlazor(o => o.DetailedErrors = true);
 @page "/@@LISTPAGENAME"
 @inject I@@CLASSNAMEService @@CLASSNAMEService
 
-<h3>@@CLASSNAME List</h3>
-<p style="text-align:center">
+<h1 style="text-align:center">@@CLASSNAME List</h1>
+<table id="search-add">
+<tr>
+<td>
     <!-- Calling @@objectnameaddedit with @@PK of zero configures page for Insert -->
     <a href="/@@OBJECTNAMEaddedit/0"><span class="oi oi-plus"></span>Add a @@CLASSNAME</a>
-</p>
+    </td>
+    <td>
+    <span class="oi oi-magnifying-glass" style="color:blue;"></span>
+    <input id="tbSearch" @bind-value="@SearchTerm"  @bind-value:event="oninput" @onkeyup="SearchKeyPress" />
+    &nbsp;<button @onclick="@Search" class="btn btn-primary">Search</button>
+    </td>
+    </tr>
+
+</table>
+<div id="list" style="display:@Listdisplay">
 @if (@@objectlist == null)
 {
     <p style="text-align:center">
@@ -374,14 +416,83 @@ else
         }
     </table>
 }
+</div>
+<!-- Error message for to few or to many in search results -->
+<div id="search-error" style="display:@Errordisplay">
+    <h1>@SearchError</h1>
+</div>
+
 
 @code {
+    //Variable used for searching (tbSearch)
+    public string SearchTerm { get; set; }
+    public string SearchError = "";
+    public string Listdisplay = "block";
+    public string Errordisplay = "none";
+
     // Create an empty list, named @@objectlist, of empty @@CLASSNAME objects.
     IEnumerable<@@CLASSNAME> @@objectlist;
+    
     protected override async Task OnInitializedAsync()
     {
         //Populate the list of @@objectname objects from the @@CLASSNAME table.
         @@objectlist = await @@CLASSNAMEService.@@CLASSNAMEList();
+    }
+    
+    //Make pressing ENTER in the search box the same as clicking the Search button.
+ private void SearchKeyPress(KeyboardEventArgs ev)
+    {
+        if (ev.Key == "Enter")
+        {
+            //System.Diagnostics.Debug.WriteLine(ev.Key);
+            Search();
+        }
+    }
+
+
+    //Do the search
+    private async void Search()
+    {
+        //Does the search and stores result in videos collection.
+        videos = await VideoService.VideoSearch(SearchTerm);
+        var howmany = videos.Count();
+        // Show results or error depending on how many found.
+        switch (howmany)
+        {
+            case int n when (n < 1):
+                errorMessage("Not found, try another search");
+                break;
+
+            case int n when (n > 250):
+                errorMessage("More than 250 results. Try another search.");
+                break;
+
+            default:
+                errorMessage("");
+                break;
+        }
+
+        //Show or hide the search results error message.
+        void errorMessage(string msgText)
+        {
+            if (msgText.Length > 0)
+            {
+                Listdisplay = "none";
+                Errordisplay = "block";
+                SearchError = msgText;
+            }
+            else
+            {
+                Listdisplay = "block";
+                Errordisplay = "none";
+                SearchError = "";
+
+            }
+            //Re-render the page.
+            StateHasChanged();
+        }
+
+        //System.Diagnostics.Debug.WriteLine(howmany);
     }
 }
 
@@ -394,15 +505,15 @@ else
 @inject NavigationManager NavigationManager
 
 
-<h1>Delete a @@CLASSNAME</h1>
+<h1 style="text-align:center">Delete a @@CLASSNAME</h1>
 <p style="color:red;text-align:center">Are you sure you want to permanently delete this @@objectname? There is no undo!</p>
 
 <table class="genform">
 	@@CONFIRMDELETEROWS
     <tr>
         <td colspan="2" style="text-align:center">
-            <input type="button" value="Delete" @onclick="@Delete" />
-            <input type="button" value="Cancel" @onclick="@Cancel" />
+            <button class="btn btn-primary" @onclick="@Delete">Delete</button>
+            <button class="btn btn-secondary" @onclick="@Cancel">Cancel</button>
         </td>
     </tr>
 </table>
@@ -422,7 +533,8 @@ else
     //Executes if user confirms the deletion.
     protected async Task Delete()
     {
-        // Delete the row and go back to the list.
+        // Delete the row and go back to the list. 
+        // In the SProc you can set IsActive to 0 rather than physically delete.
         await @@CLASSNAMEService.@@CLASSNAMEDelete(@@PK);
         NavigationManager.NavigateTo("/@@listpagename");
     }
@@ -452,29 +564,69 @@ else
 
 /* From Blazor/Dapper code generator */
 .genlist,
-.genform{
-    border-collapse:collapse;
+.genform {
+    border-collapse: collapse;
     margin: 1em auto;
 }
-.genlist th, .genlist td{
+
+.genlist th, .genlist td {
     border: solid 1px silver;
     padding: 2px 4px;
 }
+
     .genlist td:first-child,
-    .genlist td:last-child{
-        text-align:center;
+    .genlist td:last-child {
+        text-align: center;
+    }
+
+    .genlist td{
+        max-width: 400px;
     }
 
 .genform td {
-    border: solid 1px silver;
     padding: 2px 4px;
+
 }
-.genform td:first-child{
-    font-weight:bold;
-    text-align:right;
+
+    .genform td:first-child {
+        font-weight: bold;
+        text-align: right;
+    }
+    .genform td:nth-child(2) {
+       min-width: 400px;
+    }
+    .genform td input[type="date"] {
+        width: 200px;
+    }
+    .genform td input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+    }
+/* Table that holds the Add and Search options for ...List pages. */
+table#search-add{
+    border-collapse:collapse;
+    margin: 0 auto;
+
 }
-.genform input[type="text"]{
-    min-width:300px;
+    table#search-add td {
+        min-width: 400px;
+    }
+    table#search-add td:nth-child(1) {
+        text-align: left;
+    }
+    table#search-add td:nth-child(2) {
+        text-align: right;
+
+    }
+        table#search-add td input {
+            border-radius: 4px;
+            border: solid 1px silver;
+
+        }
+/* Overriding built-in styling for DataAnnotation errors */
+ul.validation-errors {
+    list-style-type: none;
+    text-align: center;
 }
 =========================================================
 = If you want to use my images, copy the images folder  =
