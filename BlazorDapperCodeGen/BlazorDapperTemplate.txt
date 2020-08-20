@@ -453,9 +453,9 @@ else
     //Do the search
     private async void Search()
     {
-        //Does the search and stores result in videos collection.
-        videos = await VideoService.VideoSearch(SearchTerm);
-        var howmany = videos.Count();
+        //Does the search and stores result in @@objectlist collection.
+        @@objectlist  = await @@CLASSNAMEService.@@CLASSNAMESearch(SearchTerm);
+        var howmany = @@objectlist.Count();
         // Show results or error depending on how many found.
         switch (howmany)
         {
