@@ -453,6 +453,9 @@ else
     //Do the search
     private async void Search()
     {
+        //Forces the progress indicator to show while searching.
+        @@objectlist = null;
+        StateHasChanged();
         //Does the search and stores result in @@objectlist collection.
         @@objectlist  = await @@CLASSNAMEService.@@CLASSNAMESearch(SearchTerm);
         var howmany = @@objectlist.Count();
