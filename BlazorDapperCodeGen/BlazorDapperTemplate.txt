@@ -29,13 +29,13 @@ BEGIN
 @@SQLINSERT
 END
 
---------------  Stored Proc for SELECT (all)
-CREATE PROCEDURE sp@@CLASSNAME_GetAll
+--------------  Stored Proc for SELECT (LIST, just first six fields but you can change in final code.)
+CREATE PROCEDURE sp@@CLASSNAME_List
 --No parameters required.
 AS
 BEGIN
 --SQL for Select stored procedure.
-@@SQLSELECTALL
+@@SQLSELECTLIST
 END
 
 --------------  Stored Proc for SELECT (one)
@@ -153,7 +153,7 @@ namespace @@NAMESPACE.Data
             IEnumerable<@@CLASSNAME> @@objectlist;
             using (var conn = new SqlConnection(_configuration.Value))
             {
-                @@objectlist = await conn.QueryAsync<@@CLASSNAME>("sp@@CLASSNAME_GetAll", commandType: CommandType.StoredProcedure);
+                @@objectlist = await conn.QueryAsync<@@CLASSNAME>("sp@@CLASSNAME_List", commandType: CommandType.StoredProcedure);
             }
             return @@objectlist;
         }
@@ -368,6 +368,10 @@ else
 {
     <table class="genlist">
         <tr>
+                <!-- Indicates what rows below are showing -->
+                <td colspan="7" style="text-align:left;font-weight:bold;font-size:120%">@Nowshowing</td>
+            </tr>
+        <tr>
             <th>Edit</th>
 		@@FIELDNAMESTABLEHEADING
             <th>Delete</th>
@@ -419,7 +423,7 @@ else
 </div>
 <!-- Error message for to few or to many in search results -->
 <div id="search-error" style="display:@Errordisplay">
-    <h1>@SearchError</h1>
+    <h2>@SearchError</h2>
 </div>
 
 
@@ -429,6 +433,7 @@ else
     public string SearchError = "";
     public string Listdisplay = "block";
     public string Errordisplay = "none";
+    public string Nowshowing = "Recent Entries";
 
     // Create an empty list, named @@objectlist, of empty @@CLASSNAME objects.
     IEnumerable<@@CLASSNAME> @@objectlist;
@@ -448,13 +453,13 @@ else
             Search();
         }
     }
-
-
     //Do the search
     private async void Search()
     {
         //Forces the progress indicator to show while searching.
+        if (SearchTerm.Length > 0 ) {
         @@objectlist = null;
+        Nowshowing = "Contains: " + SearchTerm;
         StateHasChanged();
         //Does the search and stores result in @@objectlist collection.
         @@objectlist  = await @@CLASSNAMEService.@@CLASSNAMESearch(SearchTerm);
@@ -463,16 +468,25 @@ else
         switch (howmany)
         {
             case int n when (n < 1):
-                errorMessage("Not found, try another search");
+                errorMessage("Not found, please try another search");
                 break;
 
             case int n when (n > 250):
-                errorMessage("More than 250 results. Try another search.");
+                errorMessage("More than 250 results, please try a different search.");
                 break;
 
             default:
+                //Show the search results and count.
+                Nowshowing += " (" + howmany + ")";
                 errorMessage("");
+                StateHasChanged();
                 break;
+        } } else
+        {
+            //If no search term, just do the default list.
+            Nowshowing = "Recent entries";
+            @@objectlist = await @@CLASSNAMEService.@@CLASSNAMEList();
+            StateHasChanged();
         }
 
         //Show or hide the search results error message.
@@ -626,6 +640,13 @@ table#search-add{
             border: solid 1px silver;
 
         }
+
+        #search-error{
+        text-align:center;
+        color:red;
+        margin-top:3em;
+        }
+
 /* Overriding built-in styling for DataAnnotation errors */
 ul.validation-errors {
     list-style-type: none;
