@@ -58,7 +58,7 @@
 
 
 @code{ Codetemplate codetemplate = new Codetemplate();
-    string tablename, primaryKey, sqlfieldsinsert1, sqlfieldsinsert2, sqlfieldsupdate, modelfield, parametersadd, inputtag, sqldelete, sqlselectall, sqlselectone, sqlinsert, sqlupdate, sqlsearch;
+    string tablename, primaryKey, sqlfieldsinsert1, sqlfieldsinsert2, sqlfieldsupdate, modelfield, parametersadd, inputtag, sqldelete, sqlselectlist, sqlselectone, sqlinsert, sqlupdate, sqlsearch;
     public string rawtemplate = System.IO.File.ReadAllText(@"BlazorDapperTemplate.txt");
     public void generate()
     {
@@ -124,8 +124,8 @@
             {
                 string sfldname = working.Substring(1, working.IndexOf("]") - 1);
                 sfldname = char.ToUpper(sfldname[0]) + sfldname.Substring(1);
-                // Table headings (td tags) - don't show first field (primary key)
-                if (iCounter > 1)
+                // Primary key column plus 5 more fields...just a wild guess.
+                if (iCounter > 1 && iCounter < 7)
                 {
                     tableheadings += "<th>" + sfldname + "</th>";
                     tablerows += "<td>@" + objectname + "." + sfldname + "</td>";
@@ -195,7 +195,7 @@
                 // The Update stored proc requires the primary key as a parameter, insert doesn't.
                 parametersAddUpdateOnly = "parameters.Add(" + Convert.ToChar(34) + fld.Fieldname + Convert.ToChar(34) + ", " + objectname + "." + fld.Fieldname + ", DbType." + fld.DBtype + ");\n";
                 sqldelete = "DELETE FROM " + tablename + " WHERE " + primaryKey + " = @" + primaryKey;
-                sqlselectall = "SELECT " + primaryKey;
+                sqlselectlist = "SELECT TOP 30 " + primaryKey;
                 sqlselectone = "SELECT " + primaryKey;
                 sqlinsert = "INSERT INTO " + tablename + "(";
                 sqlupdate = "UPDATE " + tablename + " SET ";
@@ -240,8 +240,11 @@
                 //}
                 //inputtag += "></td></tr>";
                 confirmdeleterows += "<tr><td>" + fld.Fieldname + ":</td><td>@" + objectname + "." + fld.Fieldname + "</td></tr>\n";
-
-                sqlselectall += ", " + fld.Fieldname;
+                // For the initial List page I show ony the first five fields, you
+                // may need to adjust in your own app.
+                if (iCounter < 7) {
+                    sqlselectlist += ", " + fld.Fieldname;
+                }
                 sqlselectone += ", " + fld.Fieldname;
                 sqlfieldsinsert1 += fld.Fieldname + ", ";
                 sqlfieldsinsert2 += "@" + fld.Fieldname + ", ";
@@ -288,13 +291,13 @@
         sqlupdate = sqlupdate.Substring(0, sqlupdate.Length - 2);
         sqlinsert += sqlfieldsinsert1 + ") VALUES (" + sqlfieldsinsert2 + ")";
         sqlupdate += " WHERE " + primaryKey + " = @" + primaryKey;
-        sqlselectall += " FROM " + tablename;
+        sqlselectlist += " FROM " + tablename + " ORDER BY " + primaryKey + " DESC";
         sqlselectone += " FROM " + tablename + " WHERE " + primaryKey + "= @" + primaryKey;
         rawtemplate = rawtemplate.Replace("@@SQLINSERT", sqlinsert);
         rawtemplate = rawtemplate.Replace("@@SQLUPDATE", sqlupdate);
 
         rawtemplate = rawtemplate.Replace("@@SQLSEARCH", sqlsearch.Substring(0, sqlsearch.Length-4));
-        rawtemplate = rawtemplate.Replace("@@SQLSELECTALL", sqlselectall);
+        rawtemplate = rawtemplate.Replace("@@SQLSELECTLIST", sqlselectlist);
         rawtemplate = rawtemplate.Replace("@@SQLSELECTONE", sqlselectone);
         rawtemplate = rawtemplate.Replace("@@SQLDELETE", sqldelete);
         return fieldlist;
