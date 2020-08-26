@@ -58,7 +58,8 @@
 
 
 @code{ Codetemplate codetemplate = new Codetemplate();
-    string tablename, primaryKey, sqlfieldsinsert1, sqlfieldsinsert2, sqlfieldsupdate, modelfield, parametersadd, inputtag, sqldelete, sqlselectlist, sqlselectone, sqlinsert, sqlupdate, sqlsearch;
+    string tablename, primaryKey, sqlfieldsinsert1, sqlfieldsinsert2, modelfield, parametersadd, inputtag, sqldelete, sqlselectlist, sqlselectone, sqlinsert, sqlupdate, sqlsearch, sqldaterange, sqlDateSearchWhereClause, shortfieldlist;
+    int iDateCounter = 0;
     public string rawtemplate = System.IO.File.ReadAllText(@"BlazorDapperTemplate.txt");
     public void generate()
     {
@@ -86,6 +87,11 @@
         string objectname = classname.ToLower();
         string listpagename = objectname + "list";
         string listname = new Pluralizer().Pluralize(objectname);
+        //Just in case Pluraizle doesn't change the name.
+        if (listname == objectname)
+        {
+            listname += "s";
+        }
         string fieldlist = @codetemplate.TableDesign;
         int firstparen = tableinfo.IndexOf("(");
         tableinfo = tableinfo.Substring(firstparen + 1);
@@ -101,6 +107,7 @@
         rawtemplate = rawtemplate.Replace("@@CLASSService", classservice);
         rawtemplate = rawtemplate.Replace("@@objectname", objectname);
         rawtemplate = rawtemplate.Replace("@@LISTPAGENAME", objectname + "list");
+        rawtemplate = rawtemplate.Replace("@@REPORTPAGENAME", objectname + "report");
         rawtemplate = rawtemplate.Replace("@@objectlist", listname);
         rawtemplate = rawtemplate.Replace("@@listpagename", listpagename);
 
@@ -124,11 +131,12 @@
             {
                 string sfldname = working.Substring(1, working.IndexOf("]") - 1);
                 sfldname = char.ToUpper(sfldname[0]) + sfldname.Substring(1);
-                // Primary key column plus 5 more fields...just a wild guess.
+                // Primary key column plus 6 more fields...just a wild guess.
                 if (iCounter > 1 && iCounter < 7)
                 {
                     tableheadings += "<th>" + sfldname + "</th>";
                     tablerows += "<td>@" + objectname + "." + sfldname + "</td>";
+                    shortfieldlist += sfldname + ", ";
                 }
 
                 bool isRequired = (working.Substring(working.Length - 4) == " NOT");
@@ -173,7 +181,7 @@
 
         foreach (Tablefield fld in fieldlist)
         {
-            if (fld.IsRequired)
+            if (fld.IsRequired && fld.Fieldname != primaryKey)
             {
                 modelfield += "[Required]\n";
             }
@@ -199,7 +207,9 @@
                 sqlselectone = "SELECT " + primaryKey;
                 sqlinsert = "INSERT INTO " + tablename + "(";
                 sqlupdate = "UPDATE " + tablename + " SET ";
-                sqlsearch = "SELECT * FROM " + tablename + " WHERE ";
+                //Remove comma and space from end of shortfieldlist.
+                sqlsearch = "SELECT " + shortfieldlist.Substring(0,shortfieldlist.Length -2) + " FROM " + tablename + " WHERE ";
+                sqldaterange = "SELECT " + shortfieldlist.Substring(0, shortfieldlist.Length - 2) + " FROM " + tablename + " WHERE ";
             }
 
             // ===================================================================================================== Input tags for adding and editing, never the primary key.
@@ -240,7 +250,7 @@
                 //}
                 //inputtag += "></td></tr>";
                 confirmdeleterows += "<tr><td>" + fld.Fieldname + ":</td><td>@" + objectname + "." + fld.Fieldname + "</td></tr>\n";
-                // For the initial List page I show ony the first five fields, you
+                // For the initial List page and date search I show ony the first five fields, you
                 // may need to adjust in your own app.
                 if (iCounter < 7) {
                     sqlselectlist += ", " + fld.Fieldname;
@@ -252,6 +262,12 @@
                 //convert dates to string for Like search
                 if (fld.SQLtype.Contains("date"))
                 {
+                    //Isolate the first date or datetime field
+                    iDateCounter += 1;
+                    if (iDateCounter == 1)
+                    {
+                        sqlDateSearchWhereClause = " CAST(" + fld.Fieldname + " AS Date) Between @startDate AND @endDate";
+                    }
                     //sqlsearchflds += "CONVERT(varchar(12)," + fld.Fieldname + ",101) AS " + fld.Fieldname + ", ";
                     sqlsearch += "CONVERT(varchar(12)," + fld.Fieldname + ",101) LIKE + '%' + @param + '%' OR ";
                 }
@@ -300,6 +316,7 @@
         rawtemplate = rawtemplate.Replace("@@SQLSELECTLIST", sqlselectlist);
         rawtemplate = rawtemplate.Replace("@@SQLSELECTONE", sqlselectone);
         rawtemplate = rawtemplate.Replace("@@SQLDELETE", sqldelete);
+        rawtemplate = rawtemplate.Replace("@@SQLDATERANGE", sqldaterange + sqlDateSearchWhereClause);
         return fieldlist;
     }
 
