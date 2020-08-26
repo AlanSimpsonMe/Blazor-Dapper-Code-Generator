@@ -19,7 +19,6 @@ namespace BlazorDapperCodeGen.Data
         {
 
         }
-
         public Tablefield(string fieldname, string sqlytpe, string codetype, string dbtype, int length, bool isrequired)
         {
             this.Fieldname = fieldname;
