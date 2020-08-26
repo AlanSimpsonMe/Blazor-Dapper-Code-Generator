@@ -8,16 +8,51 @@ Things you need to do in Visual Studio
 
 3. Create your Database (https://youtu.be/RkzRci8SNCw)
 
-4. Add the correct connectionstring to appsettings.json (see https://www.youtube.com/watch?v=5XyPWMayg2Q)
+4. Just once per database (not for each table in the database), add the correct connectionstring to appsettings.json (see https://www.youtube.com/watch?v=5XyPWMayg2Q)
 
 "ConnectionStrings":{
      "SqlDBcontext" : "Your connection string here"
 }
 
+5. Just once per database (not each table) in  your Data folder create a file named SqlConnectionConfiguration.cs and
+   add to it the following code.
+
+---------------------------- /DATA/SqlConnectionConfiguration.cs
+namespace @@NAMESPACE.Data
+{
+    // Connection to SQL Server database, used within Data subfolder.
+    // You need to set the connection string in appsettings.json and configure Startup.cs yourself.
+    // In startup.cs add the following with the connectionstring name from appsettings.json inplace of YOURCONNECTIONNAME.
+    //  var sqlConnectionConfiguration = new SqlConnectionConfiguration(Configuration.GetConnectionString("YOURCONNECTIONNAME"));
+    //  services.AddSingleton(sqlConnectionConfiguration);
+    public class SqlConnectionConfiguration
+    {
+        public SqlConnectionConfiguration(string value) => Value = value;
+        public string Value { get; }
+    }
+}
+
+6. Just once per database (not each table) put this code just below the line that reads AddSingleton<WeatherForecastService>(); : 
+
+
+-------------------- Note that the name sqlDBcontext has to match the name
+-------------------- that you actually provided in appsetting.json or it won't work.
+
+//SQL database connection (name defined in appsettings.json)
+var SqlConnectionConfiguration = new SqlConnectionConfiguration(Configuration.GetConnectionString("SqlDBcontext"));
+
+services.AddSingleton(SqlConnectionConfiguration);
+//Optional for debugging
+services.AddServerSideBlazor(o => o.DetailedErrors = true);
+
+
+-- Then you can remove the line that reads AddSingleton<WeatherForecastService>(); fron startup.cs.
 
 
 =========================================================
 = Stored procedures go in the database, not the app.    =
+= You can copy them all into a SQL Management query and =
+= select and execute them one at a time.                =
 =========================================================
 -------------- Stored Proc for INSERT
 CREATE PROCEDURE sp@@CLASSNAME_Insert
@@ -49,8 +84,7 @@ BEGIN
 END
 
 
---------------  Stored Proc for Search. This one is really a wild guess.
---------------  You may need to re-do this one for realistic searches.
+--------------  Stored Proc for SELECT LIKE
 CREATE PROCEDURE sp@@CLASSNAME_Search
 -- One parameter required to identify row to delete.
 @Param varchar(128)
@@ -60,6 +94,16 @@ BEGIN
 @@SQLSEARCH 
 END
 
+------------- Stored Proc for SELECT DATA RANGE
+-- Another wild guess, but better than nothin'
+CREATE PROCEDURE sp@@CLASSNAME_DateRange
+@StartDate date,
+@EndDate date
+AS
+BEGIN
+-- SQL for search looking range of dates
+@@SQLDATERANGE
+END
 
 --------------  Stored Proc for UPDATE
 CREATE PROCEDURE sp@@CLASSNAME_Update
@@ -81,25 +125,14 @@ BEGIN
 @@SQLDELETE
 END
 
-=========================================================
-=  DATA folder files                                    =
-=========================================================
 
----------------------------- /DATA/SqlConnectionConfiguration.cs
-namespace @@NAMESPACE.Data
-{
-    // Connection to SQL Server database, used within Data subfolder.
-    // You need to set the connection string in appsettings.json and configure Startup.cs yourself.
-    // In startup.cs add the following with the connectionstring name from appsettings.json inplace of YOURCONNECTIONNAME.
-    //  var sqlConnectionConfiguration = new SqlConnectionConfiguration(Configuration.GetConnectionString("YOURCONNECTIONNAME"));
-    //  services.AddSingleton(sqlConnectionConfiguration);
-    public class SqlConnectionConfiguration
-    {
-        public SqlConnectionConfiguration(string value) => Value = value;
-        public string Value { get; }
-    }
+========================================================
+Back in VIsual Studio, you need to add some classes
+and an interface to the Data folder, with the 
+names shown below.
 
-}
+
+You should have three classes, per database table, in the Data folder.
 
 ---------------------------- /DATA/@@CLASSNAME.cs
 using System;
@@ -117,6 +150,7 @@ namespace @@NAMESPACE.Data
 // This is the service for the @@CLASSNAME class.
 using Dapper;
 using Microsoft.Data.SqlClient;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Threading.Tasks;
@@ -131,7 +165,6 @@ namespace @@NAMESPACE.Data
         {
             _configuration = configuration;
         }
-
         // Add (create) a @@CLASSNAME table row (SQL Insert)
         // This only works if you're already created the stored procedure.
         public async Task<bool> @@CLASSNAMEInsert(@@CLASSNAME @@objectname)
@@ -145,7 +178,6 @@ namespace @@NAMESPACE.Data
             }
             return true;
         }     
-
         // Get a list of @@objectname rows (SQL Select)
         // This only works if you're already created the stored procedure.
         public async Task<IEnumerable<@@CLASSNAME>> @@CLASSNAMEList()
@@ -157,8 +189,7 @@ namespace @@NAMESPACE.Data
             }
             return @@objectlist;
         }
-
-        	//Search for data (very generic...you may need to adjust.
+      	//Search for data (very generic...you may need to adjust.
         public async Task<IEnumerable<@@CLASSNAME>> @@CLASSNAMESearch(string @Param)
         {
             var parameters = new DynamicParameters();
@@ -167,6 +198,20 @@ namespace @@NAMESPACE.Data
             using (var conn = new SqlConnection(_configuration.Value))
             {
                 @@objectlist = await conn.QueryAsync<@@CLASSNAME>("sp@@CLASSNAME_Search", parameters, commandType: CommandType.StoredProcedure);
+            }
+            return @@objectlist;
+        }
+        // Search based on date range. Code generator makes wild guess, you 
+        // will likely need to adjust field names
+        public async Task<IEnumerable<@@CLASSNAME>> @@CLASSNAMEDateRange(DateTime @StartDate, DateTime @EndDate)
+        {
+            var parameters = new DynamicParameters();
+            parameters.Add("@StartDate", StartDate, DbType.Date);
+            parameters.Add("@EndDate", EndDate, DbType.Date);
+            IEnumerable<@@CLASSNAME>  @@objectlist;
+            using (var conn = new SqlConnection(_configuration.Value))
+            {
+                @@objectlist = await conn.QueryAsync<@@CLASSNAME>("sp@@CLASSNAME_DateRange", parameters, commandType: CommandType.StoredProcedure);
             }
             return @@objectlist;
         }
@@ -184,7 +229,6 @@ namespace @@NAMESPACE.Data
             }
             return @@objectname;
         }
-
         // Update one @@CLASSNAME row based on its @@CLASSNAMEID (SQL Update)
         // This only works if you're already created the stored procedure.
         public async Task<bool> @@CLASSNAMEUpdate(@@CLASSNAME @@objectname)
@@ -216,6 +260,7 @@ namespace @@NAMESPACE.Data
 
 ---------------------------- /Data/I@@CLASSNAMEService.cs
 // This is the @@CLASSNAME Interface
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -227,49 +272,34 @@ namespace @@NAMESPACE.Data
         Task<bool> @@CLASSNAMEInsert(@@CLASSNAME @@objectname);
         Task<IEnumerable<@@CLASSNAME>> @@CLASSNAMEList();
         Task<IEnumerable<@@CLASSNAME>> @@CLASSNAMESearch(string Param);
+        Task<IEnumerable<@@CLASSNAME>> @@CLASSNAMEDateRange(DateTime @StartDate, DateTime @EndDate);
         Task<@@CLASSNAME> @@CLASSNAME_GetOne(int @@PK);
         Task<bool> @@CLASSNAMEUpdate(@@CLASSNAME @@objectname);
         Task<bool> @@CLASSNAMEDelete(int @@PK);
     }
 }
-
-=========================================================
-= Database connection and service - goes in Startup.cs  =
-=========================================================
---------------------- At the top of Startup.cs add the following (if it's not already there)
-
-using @@NAMESPACE.Data;
-
--------------------- Then in Startup.cs replace services.AddSingleton<WeatherForecastService>(); 
--------------------- with the lines below. Note that the name sqlDBcontext has to match the name
--------------------- that you actually provided in appsetting.json or it won't work.
+=======================================================
+= With the classes finished, open up Startup.cs and 
+= add the services.AddScoprf linr below to the 
+=  public void ConfigureService{} block, perhaps just
+=  above the comment and code that defines SqlConnectionConfiguration
+========================================================
 
 services.AddScoped<I@@CLASSNAMEService, @@CLASSNAMEService>();
 
-//SQL database connection (name defined in appsettings.json)
-var SqlConnectionConfiguration = new SqlConnectionConfiguration(Configuration.GetConnectionString("SqlDBcontext"));
-
-services.AddSingleton(SqlConnectionConfiguration);
-//Optional for debugging
-services.AddServerSideBlazor(o => o.DetailedErrors = true);
-
-
 
 =========================================================
-= Razor components that go in the PAGES folder          =                                             
+= Next comes the pages. Each goes in the Pages folder
+= and each should be defined as a Razor Component.                                             
 =========================================================
 
 ---------------------------- /PAGES/@@CLASSNAMEAddEdit.razor
-
 @using @@NAMESPACE.Data
 @page "/@@OBJECTNAMEaddedit/{@@PK:int}"
 @inject I@@CLASSNAMEService @@CLASSNAMEService
 @inject NavigationManager NavigationManager
-@*Okay to use DataAnnotationsValidator and ValidationSummary here, if you like. See...
-    https://docs.microsoft.com/en-us/aspnet/core/blazor/forms-validation?view=aspnetcore-3.1*@
 
 <h1 style="text-align:center">@pagetitle</h1>
-
 <EditForm Model="@@@objectname" OnValidSubmit="@@@CLASSNAMESave">
 <table class="genform">
         <!-- You may want to change some type="" choices to better suit your own data -->
@@ -277,19 +307,19 @@ services.AddServerSideBlazor(o => o.DetailedErrors = true);
             <tr><td colspan="2">
     <DataAnnotationsValidator />
     <ValidationSummary />
-    </td></tr>
-         <tr>
+    </td>
+    </tr>
+    <tr>
          <td colspan="2" style="text-align:center">
                 <button class="btn btn-primary">@buttontext</button>
                 <button class="btn btn-secondary" @onclick="@Cancel">Cancel</button>
     </td></tr>
-
     </table>
 </EditForm>
 
 @code {
-            // Create a new, empty @@CLASSNAME object
-@@CLASSNAME @@objectname = new @@CLASSNAME();
+   // Create a new, empty @@CLASSNAME object
+   @@CLASSNAME @@objectname = new @@CLASSNAME();
 
     [Parameter]
     public int @@PK { get; set; }
@@ -330,14 +360,13 @@ services.AddServerSideBlazor(o => o.DetailedErrors = true);
         NavigationManager.NavigateTo("/@@listpagename");
     }
     //Executes if user clicks the Cancel button.
-    void Cancel()
+    protected void Cancel()
     {
         NavigationManager.NavigateTo("/@@listpagename");
     }
 }
 
 ---------------------------- /PAGES/@@CLASSNAMEList.razor
-
 @using @@NAMESPACE.Data
 @page "/@@LISTPAGENAME"
 @inject I@@CLASSNAMEService @@CLASSNAMEService
@@ -422,10 +451,9 @@ else
 }
 </div>
 <!-- Error message for to few or to many in search results -->
-<div id="search-error" style="display:@Errordisplay">
+<div class="error" style="display:@Errordisplay">
     <h2>@SearchError</h2>
 </div>
-
 
 @code {
     //Variable used for searching (tbSearch)
@@ -434,7 +462,6 @@ else
     public string Listdisplay = "block";
     public string Errordisplay = "none";
     public string Nowshowing = "Recent Entries";
-
     // Create an empty list, named @@objectlist, of empty @@CLASSNAME objects.
     IEnumerable<@@CLASSNAME> @@objectlist;
     
@@ -445,7 +472,7 @@ else
     }
     
     //Make pressing ENTER in the search box the same as clicking the Search button.
- private void SearchKeyPress(KeyboardEventArgs ev)
+    private void SearchKeyPress(KeyboardEventArgs ev)
     {
         if (ev.Key == "Enter")
         {
@@ -453,11 +480,12 @@ else
             Search();
         }
     }
+    
     //Do the search
     private async void Search()
     {
-        //Forces the progress indicator to show while searching.
-        if (SearchTerm.Length > 0 ) {
+    //Forces the progress indicator to show while searching.
+    if (SearchTerm.Length > 0 ) {
         @@objectlist = null;
         Nowshowing = "Contains: " + SearchTerm;
         StateHasChanged();
@@ -465,24 +493,22 @@ else
         @@objectlist  = await @@CLASSNAMEService.@@CLASSNAMESearch(SearchTerm);
         var howmany = @@objectlist.Count();
         // Show results or error depending on how many found.
-        switch (howmany)
-        {
+          switch (howmany)
+          {
             case int n when (n < 1):
                 errorMessage("Not found, please try another search");
                 break;
-
             case int n when (n > 250):
                 errorMessage("More than 250 results, please try a different search.");
                 break;
-
             default:
                 //Show the search results and count.
                 Nowshowing += " (" + howmany + ")";
                 errorMessage("");
                 StateHasChanged();
                 break;
-        } } else
-        {
+          } 
+        } else {
             //If no search term, just do the default list.
             Nowshowing = "Recent entries";
             @@objectlist = await @@CLASSNAMEService.@@CLASSNAMEList();
@@ -503,19 +529,170 @@ else
                 Listdisplay = "block";
                 Errordisplay = "none";
                 SearchError = "";
-
             }
             //Re-render the page.
             StateHasChanged();
         }
-
         //System.Diagnostics.Debug.WriteLine(howmany);
     }
 }
 
 
----------------------------- /Pages/@@CLASSNAMEDelete.razor
+---------------------------- /Pages/@@CLASSNAMEReport.razor
+@using @@NAMESPACE.Data
+@page "/@@REPORTPAGENAME"
+@inject I@@CLASSNAMEService @@CLASSNAMEService
+@inject NavigationManager NavigationManager
 
+  <div id="date-search-tools">
+        <div id="GetDates" style="display:@ToolsVisible">
+        <h1 style="text-align:center">@@CLASSNAME Report</h1>
+            <table>
+                <tr>
+                    <td>
+                        Start Date: <input type="date" id="tbStartDate" @bind-value="@StartDate" />
+                    </td>
+                    <td>
+                        End Date: <input type="date" id="tbEndtDate" @bind-value="@EndDate" @bind-value:event="oninput" @onkeyup="SearchKeyPress" />
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2" style="text-align:center;">
+                        &nbsp;<button @onclick="@Search" class="btn btn-primary">Search</button>
+                    </td>
+                </tr>
+
+            </table>
+        </div>
+    </div>
+    <div id="list" style="display:@ReportVisible">
+      <table id="search-buttons">
+            <tr>
+                <td><button class="btn btn-primary" onclick="window.print()">Print or PDF</button></td>
+                <td><button class="btn btn-secondary" onclick="location.href='@@objectnamereport'">Cancel</button>
+                </td>
+            </tr>
+        </table>
+    <h1 style="text-align:center">@@CLASSNAME Report</h1>
+    <p style="text-align:center;">From @StartDate.ToShortDateString() to @EndDate.ToShortDateString()</p>
+        <table class="genlist">
+            <thead>
+                <tr>
+              		@@FIELDNAMESTABLEHEADING
+                </tr>
+            </thead>
+            <tbody>
+                @if (@@objectlist != null)
+                {
+                    @foreach (var @@objectname in @@objectlist)
+                    {
+                    <tr>
+	                   	@@FIELDNAMESTABLEROW
+                    </tr>
+                    }
+                }
+            </tbody>
+        </table>
+        <table id="search-buttons">
+            <tr>
+                <td><button class="btn btn-primary" onclick="window.print()">Print or PDF</button></td>
+                <td><button class="btn btn-secondary" onclick="location.href='@@objectnamereport'">Cancel</button>
+                </td>
+            </tr>
+        </table>
+    </div>
+       <!-- Error message for to few or to many in search results -->
+    <div class="error" style="display:@Errordisplay">
+        <h1>@SearchError</h1>
+    </div>
+   
+   @code {
+        //Variables used for searching
+        public DateTime StartDate { get; set; } = DateTime.Today;
+        public DateTime EndDate { get; set; } = DateTime.Today;
+        public string SearchError = "";
+        public string ToolsVisible = "block";
+        public string ReportVisible = "none";
+        public string Errordisplay = "none";
+
+        // Create an empty list, named videos, of empty Video objects.
+        IEnumerable<@@CLASSNAME> @@objectlist;
+
+        protected override void OnInitialized()
+        {
+            @if (@@objectlist == null)
+            {
+                ShowReport(false);
+            }
+            else
+            {
+                ShowReport(true);
+            }
+            StateHasChanged();
+        }
+
+        //Make pressing ENTER in the search box the same as clicking the Search button.
+        private void SearchKeyPress(KeyboardEventArgs ev)
+        {
+            if (ev.Key == "Enter")
+            {
+                //System.Diagnostics.Debug.WriteLine(ev.Key);
+                Search();
+            }
+        }
+        private void ShowReport(bool ShowRep)
+        {
+            if (ShowRep)
+            {
+                ToolsVisible = "none";
+                ReportVisible = "block";
+            }
+            else
+            {
+                ToolsVisible = "block";
+                ReportVisible = "none";
+            }
+        }
+
+        //Do the search
+        private async void Search()
+        {
+            @@objectlist = null;
+            StateHasChanged();
+            //Does the search and stores result in collection.
+            @@objectlist = await @@CLASSNAMEService.@@CLASSNAMEDateRange(StartDate, EndDate);
+            var howmany = @@objectlist.Count();
+            // Show results or error depending on how many found.
+            if (howmany < 1 ) {
+               errorMessage("Not found, try another search");
+            } else {
+               errorMessage("");
+            }
+            StateHasChanged();
+
+            ////Show or hide the search results error message.
+            void errorMessage(string msgText)
+            {
+                if (msgText.Length > 0)
+                {
+                    ShowReport(false);
+                    Errordisplay = "block";
+                    SearchError = msgText;
+                } else  {
+                    ShowReport(true);
+                    Errordisplay = "none";
+                    SearchError = "";
+                }
+                //Re-render the page.
+                StateHasChanged();
+            }
+
+            //System.Diagnostics.Debug.WriteLine(howmany);
+        }
+    }
+
+
+---------------------------- /Pages/@@CLASSNAMEDelete.razor
 @using @@NAMESPACE.Data
 @page "/@@OBJECTNAMEdelete/{@@PK:int}"
 @inject I@@CLASSNAMEService @@CLASSService
@@ -586,72 +763,124 @@ else
     margin: 1em auto;
 }
 
-.genlist th, .genlist td {
-    border: solid 1px silver;
-    padding: 2px 4px;
-}
-
-    .genlist td:first-child,
-    .genlist td:last-child {
-        text-align: center;
+    .genlist th, .genlist td {
+        border: solid 1px silver;
+        padding: 2px 4px;
     }
 
-    .genlist td{
+        .genlist td:first-child,
+        .genlist td:last-child {
+            text-align: center;
+        }
+
+    .genlist td {
         max-width: 400px;
     }
 
-.genform td {
-    padding: 2px 4px;
+    .genform td {
+        padding: 2px 4px;
+    }
 
-}
+        .genform td:first-child {
+            font-weight: bold;
+            text-align: right;
+        }
 
-    .genform td:first-child {
-        font-weight: bold;
-        text-align: right;
-    }
-    .genform td:nth-child(2) {
-       min-width: 400px;
-    }
-    .genform td input[type="date"] {
-        width: 200px;
-    }
-    .genform td input[type="checkbox"] {
-        width: 20px;
-        height: 20px;
-    }
+        .genform td:nth-child(2) {
+            min-width: 400px;
+        }
+
+        .genform td input[type="date"] {
+            width: 200px;
+        }
+
+        .genform td input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
 /* Table that holds the Add and Search options for ...List pages. */
-table#search-add{
-    border-collapse:collapse;
+table#search-add {
+    border-collapse: collapse;
     margin: 0 auto;
-
 }
+
     table#search-add td {
         min-width: 400px;
     }
-    table#search-add td:nth-child(1) {
-        text-align: left;
-    }
-    table#search-add td:nth-child(2) {
-        text-align: right;
 
-    }
+        table#search-add td:nth-child(1) {
+            text-align: left;
+        }
+
+        table#search-add td:nth-child(2) {
+            text-align: right;
+        }
+
         table#search-add td input {
             border-radius: 4px;
             border: solid 1px silver;
-
         }
 
-        #search-error{
-        text-align:center;
-        color:red;
-        margin-top:3em;
-        }
+#date-search-tools table {
+    margin: 1em auto;
+    border-collapse: collapse;
+}
 
+#date-search-tools table td {
+    border: solid 1px silver;
+    padding: 6px 4px;
+}
+
+#date-search-tools table td input {
+    width: 140px;
+}
+
+#search-buttons{
+    margin:1em auto;
+}
+.error{
+   text-align:center;
+   color:red;
+}
 /* Overriding built-in styling for DataAnnotation errors */
 ul.validation-errors {
     list-style-type: none;
     text-align: center;
 }
+
+@media print {
+    @page {
+        size: auto; /* auto is the initial value */
+        margin: 1in .5in 1in .5in; /* this affects the margin in the printer settings */
+    }
+    
+@page:right{
+  @bottom-right {
+    content: "Page " counter(page) " of " counter(pages);
+  }
+}
+    thead {
+        display: table-header-group;
+    }
+    .sidebar {
+        display: none;
+    }
+
+    .top-row {
+        display: none;
+    }
+
+    #date-search-tools {
+        display: none;
+    }
+    #date-search-tools button {
+        display: none;
+    }
+    #search-buttons{
+        display:none;
+    }
+}
+
 =========================================================
 = If you want to use my images, copy the images folder  =
 = from the wwwroot in BlazorDapperGen to the wwwroot    =
