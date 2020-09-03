@@ -148,4 +148,3 @@ static class TypeMapper
 
     }
 }
-
