@@ -127,7 +127,7 @@ END
 
 
 ========================================================
-Back in VIsual Studio, you need to add some classes
+Back in Visual Studio, you need to add some classes
 and an interface to the Data folder, with the 
 names shown below.
 
@@ -300,21 +300,24 @@ services.AddScoped<I@@CLASSNAMEService, @@CLASSNAMEService>();
 @inject NavigationManager NavigationManager
 
 <h1 style="text-align:center">@pagetitle</h1>
-<EditForm Model="@@@objectname" OnValidSubmit="@@@CLASSNAMESave">
-<table class="genform">
+<EditForm Model="@@@objectname" OnValidSubmit="@@@CLASSNAMESave" class="form-inline">
+<div class="container">
         <!-- You may want to change some type="" choices to better suit your own data -->
         @@INPUTONEROWS
-            <tr><td colspan="2">
+
+<div class="row">
+<div class="col-12 errormsg">
     <DataAnnotationsValidator />
     <ValidationSummary />
-    </td>
-    </tr>
-    <tr>
-         <td colspan="2" style="text-align:center">
-                <button class="btn btn-primary">@buttontext</button>
-                <button class="btn btn-secondary" @onclick="@Cancel">Cancel</button>
-    </td></tr>
-    </table>
+</div>
+</div>
+<div class="row">
+<div class="col-12 buttons">
+<button class="btn btn-primary">@buttontext</button>
+<button class="btn btn-secondary" @onclick="@Cancel">Cancel</button>
+</div>
+</div>
+</div>
 </EditForm>
 
 @code {
@@ -751,53 +754,290 @@ else
    </NavLink>
 </li>
 
+==========================================================================
+= If you need to use this table for a dropdown list control, here is 
+= some code to help, but you;ll have to flesh-out the details on your own
+==========================================================================
+------------------------- Stored Procedure for dropdown.
+CREATE PROCEDURE [dbo].[sp@@CLASSNAME_GetDropdown]
+        @IncludeNumber int
+        AS
+        BEGIN
+		-- You'll have to provide your own field names, and maybe change IsActive if you don't have that field
+        SELECT        YOUR_BOUND_FIELD, YOU_DROPDOWN-VISIBLE_FIELD
+        FROM            @@TABLENAME
+        WHERE IsActive = 1  OR @@PK = @IncludeNumber
+        ORDER BY YOUR_ORDER_BY_FIELD 
+END
+
+---------------------------- For the Service Class.
+public async Task<IEnumerable<@@CLASSNAME>> @@CLASSNAME_GetDropdown(int @IncludeNumber)
+    {
+        var parameters = new DynamicParameters();
+        parameters.Add("@IncludeNumber", IncludeNumber, DbType.Int32);
+
+        IEnumerable<@@CLASSNAME> @@objectlist;
+        using (var conn = new SqlConnection(_configuration.Value))
+            {
+                @@objectlist; = await conn.QueryAsync<@@CLASSNAME>("sp@@CLASSNAME_GetDropdown", parameters, commandType: CommandType.StoredProcedure);
+            }
+        return @@objectlist;
+    }
+
+---------------------------- For the Iservice Class.
+Task<IEnumerable<@@CLASSNAME>> @@CLASSNAME_GetDropdown(int @IncludeNumber);
+
+---------------------------- For the top of AddEdit page.
+@inject I@@CLASSNAMEService @@CLASSNAMEService
+
+---------------------------- Near the top of the @Code{} section.
+//For the dropdown
+@@CLASSNAME @@objectname = new @@CLASSNAME();
+IEnumerable<@@CLASSNAME> @@objectlist;
+
+
+------------------------- Code to populate dropdown for new INSERT rows (in OnInitAsync when Row ID is zero):
+//Populate the dropdown, no inActive items required on new entry 
+@@objectlist = await @@CLASSNAMEService.@@CLASSNAME_GetDropdown(0);
+
+------------------------ Code to populate dropdown for new UPDATE rows (in OnInitAsync when Row ID is NOT zero):
+//When doing an update, include the id of the current item in case
+//it's been marked inactive since initally applied.
+MAINPAGE x = new MAINPAGE();
+x = await MAINPAGESERVICE.MAINPAGE_GetOne(ID OF ITEM ON MAIN PAGE);
+//Need to include this row's selected item in the dropdown, even it it's no longer active.
+@@objectlist = await @@CLASSNAMEService.@@CLASSNAME_GetOne(KEY_OF_AddEdit_PAGE_ROW);
+
+------------------------ The actual select control on the AddEdit page where user makes their choice.
+<InputSelect @bind-Value="MAINPAGE.KEYVALUE" class='form-control' id='KEYVALUE'>
+    @if (objectlist != null)
+    {
+        @foreach (var @@objectname in @@objectlist)
+            {
+                <option value="@@objectname.KEYVALUE">@@objectname.FIELD_THAT_SHOWS_IN_DROPDOWN</option>
+            }
+    }
+</InputSelect>
+			
+===========================================================================
+= End of optional Dropdown List code
+===========================================================================
+
+
+
 ===========================================================
 = You can put this CSS code on wwwroot/css/site.css if    =
 = you want some rudimentary styling for the generated html=
 ===========================================================
 
+@import url('open-iconic/font/css/open-iconic-bootstrap.min.css');
+
+body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+header {
+    position: fixed;
+    top: 0;
+    height: 40px;
+    width: 100%;
+    background-color: #82C7FF;
+    padding-right: 10px;
+    z-index: 100;
+}
+
+    header img {
+        position: absolute;
+        top: 4px;
+        left: 4px;
+        height: 48px;
+        z-index: 3200;
+    }
+
+    header h1 {
+        margin-left: 48px;
+        color: white;
+        font-size: 18pt;
+        line-height: 40px;
+        text-shadow: 1px 1px 0px rgba(0,0,0,.9);
+        padding: 2px 0 0 8px;
+    }
+
+    header div {
+        position: absolute;
+        top: 0;
+        right: 10px;
+        width: 60%;
+        line-height: 40px;
+    }
+
+aside {
+    position: fixed;
+    left: 0;
+    top: 40px;
+    width: 200px;
+    height: 100vh;
+    background-color: #82C7FF;
+    padding-top: 30px;
+}
+
+    aside a {
+        display: block;
+        width: 80%;
+        margin: 2em auto;
+        padding: 6px 3px;
+        border: solid 1px rgba(255,255,255,.8);
+        text-decoration: none;
+        border-radius: 4px;
+        background-color: rgba(255,255,255,.6);
+        text-align: center;
+        color: black;
+        font-size: 85%;
+    }
+
+        aside a:hover {
+            text-decoration: none;
+            color: lightseagreen;
+            border: solid 1px rgba(255,255,255,.6);
+            background-color: rgba(255,255,255,.8);
+        }
+
+main {
+    margin: 40px 16px 0 210px;
+    padding: 8px;
+}
+
+footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: rgba(255,255,255,.7);
+    font-size: 80%;
+    text-align: center;
+    color: darkgrey;
+}
+
+#homepage {
+    text-align: center;
+}
+
+
 /* From Blazor/Dapper code generator */
-.genlist,
-.genform {
+
+table.genlist {
     border-collapse: collapse;
     margin: 1em auto;
 }
 
-    .genlist th, .genlist td {
-        border: solid 1px silver;
-        padding: 2px 4px;
+/* Generated list */
+
+.genlist tr:nth-child(odd) {
+    background-color: Aliceblue;
+}
+
+.genlist tr:hover {
+    background-color: lightyellow;
+}
+
+.genlist th, .genlist td {
+    border: solid 1px silver;
+    padding: 2px 4px;
+    font-size: 90%;
+    font-family: 'Arial Narrow', Arial, sans-serif
+}
+
+    .genlist td:first-child,
+    .genlist td:last-child {
+        text-align: center;
     }
 
-        .genlist td:first-child,
-        .genlist td:last-child {
-            text-align: center;
-        }
+.genlist td {
+    max-width: 400px;
+}
 
-    .genlist td {
-        max-width: 400px;
+.genlist th,
+.genlist td {
+    padding: 2px 4px;
+}
+
+.container {
+    border: dotted pink 1px;
+}
+
+    .container .col-2,
+    .container .col-4,
+    .container .col-12 {
+        border: dotted yellow 1px;
+    }
+/* CSS for generated forms */
+.genform input.form-control {
+    height: auto !important;
+    padding: 2px 4px !important;
+}
+
+.genform select.form-control {
+    height: auto !important;
+    padding: 4px !important;
+    margin-bottom: 4px;
+}
+
+.genform input[type="date"].form-control,
+.genform input[type="number"].form-control {
+    height: auto !important;
+    padding: 2px 4px !important;
+    width: 200px;
+    display: inline;
+}
+
+.genform input[type="checkbox"] {
+    /*    width: 20px;
+    height: 20px;*/
+}
+
+.genform input:read-only {
+    border: none;
+    background-color: transparent;
+    color: darkgray;
+}
+
+    .genform input:read-only:focus,
+    .genform input:read-only valid {
+        border: none;
     }
 
-    .genform td {
-        padding: 2px 4px;
-    }
+.genform input[type="checkbox"].form-control {
+    display: inline;
+    margin: 0;
+    padding: 0;
+}
 
-        .genform td:first-child {
-            font-weight: bold;
-            text-align: right;
-        }
+.genform input[type="checkbox"] + label {
+    display: inline;
+    margin: 0;
+    padding: 0;
+    font-weight: bold;
+}
 
-        .genform td:nth-child(2) {
-            min-width: 400px;
-        }
 
-        .genform td input[type="date"] {
-            width: 200px;
-        }
+/* Labels for controls  */
+.lbl {
+    text-align: right;
+    font-weight: bold;
+}
 
-        .genform td input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-        }
+
+.buttons {
+    padding: 10px 0;
+    text-align: center;
+}
+
+
+.errormsg {
+    text-align: center;
+    color: red;
+}
+
 /* Table that holds the Add and Search options for ...List pages. */
 table#search-add {
     border-collapse: collapse;
@@ -821,65 +1061,66 @@ table#search-add {
             border: solid 1px silver;
         }
 
+/* Controls that let people search by date range */
 #date-search-tools table {
     margin: 1em auto;
     border-collapse: collapse;
 }
 
-#date-search-tools table td {
-    border: solid 1px silver;
-    padding: 6px 4px;
-}
-
-#date-search-tools table td input {
-    width: 140px;
-}
-
-#search-buttons{
-    margin:1em auto;
-}
-.error{
-   text-align:center;
-   color:red;
-}
-/* Overriding built-in styling for DataAnnotation errors */
-ul.validation-errors {
-    list-style-type: none;
-    text-align: center;
-}
-
-@media print {
-    @page {
-        size: auto; /* auto is the initial value */
-        margin: 1in .5in 1in .5in; /* this affects the margin in the printer settings */
-    }
-    
-@page:right{
-  @bottom-right {
-    content: "Page " counter(page) " of " counter(pages);
-  }
-}
-    thead {
-        display: table-header-group;
-    }
-    .sidebar {
-        display: none;
+    #date-search-tools table td {
+        border: solid 1px silver;
+        padding: 6px 4px;
     }
 
-    .top-row {
-        display: none;
-    }
+        #date-search-tools table td input {
+            width: 140px;
+        }
 
-    #date-search-tools {
-        display: none;
-    }
-    #date-search-tools button {
-        display: none;
-    }
-    #search-buttons{
-        display:none;
-    }
+#search-buttons {
+    margin: 1em auto;
 }
+
+.valid.modified:not([type=checkbox]) {
+    outline: 1px solid #26b050;
+}
+
+.invalid {
+    outline: 1px solid red;
+}
+
+.strikethrough {
+    text-decoration: line-through;
+    text-decoration-color: red;
+}
+
+.validation-message {
+    color: red;
+}
+
+#blazor-error-ui {
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+    }
+/* Boostrap overrides */
+/*@media (min-width: 576px) {
+    .form-inline .form-control {
+        width: 100% !important;
+    }
+}*/
 
 =========================================================
 = If you want to use my images, copy the images folder  =
