@@ -223,15 +223,27 @@
                 if (fld.SQLtype == "text") {
                     cappedType = "TextArea";
                 }
-                inputtag += "<tr><td><label for = '" + fld.Fieldname + "'>" + fld.Fieldname + ":</label></td><td>\n<Input" + cappedType + " @bind-Value = " + Convert.ToChar(34) + objectname + "." + fld.Fieldname + Convert.ToChar(34) + " class='form-control'";
+                if (iCounter % 2 == 0 )
+                {
+                    inputtag += "<div class='row'>\n";
+                }
+                inputtag += "<div class='col-2'>\n<label for = '" + fld.Fieldname + "'>" + fld.Fieldname + ":</label>\n</div>\n<div class='col-4'>\n<Input" + cappedType + " @bind-Value = " + Convert.ToChar(34) + objectname + "." + fld.Fieldname + Convert.ToChar(34) + " class='form-control'";
+
+                if (fld.SQLtype.Contains("varchar") || fld.SQLtype.Contains("text"))
+                {
+                    inputtag += " style='width:100%;'";
+                }
                 //The date ranges don't work in the model, so adding here.
                 if (fld.SQLtype.Contains("date"))
                 {
                     inputtag += " min=" + Convert.ToChar(34) + "1753-01-01" + Convert.ToChar(34) + " max=" + Convert.ToChar(34) + "9999-12-31" + Convert.ToChar(34);
                 }
 
-                inputtag += "/></td></tr>\n";
-
+                inputtag += " id = '" + fld.Fieldname + "'/></div>\n";
+                if (iCounter % 2 != 0)
+                {
+                    inputtag += "</div>\n";
+                }
                 //if (TypeMapper.GetHtmlType(fld.Codetype) == "date")
                 //{
                 //    inputtag += " min=" + Convert.ToChar(34) + "1753-01-01" + Convert.ToChar(34) + " max=" + Convert.ToChar(34) + "9999-12-31" + Convert.ToChar(34);
@@ -249,7 +261,7 @@
                 //    inputtag += " required ";
                 //}
                 //inputtag += "></td></tr>";
-                confirmdeleterows += "<tr><td>" + fld.Fieldname + ":</td><td>@" + objectname + "." + fld.Fieldname + "</td></tr>\n";
+                confirmdeleterows += "<div class='form-group'>" + fld.Fieldname + ":@" + objectname + "." + fld.Fieldname + "</div>\n";
                 // For the initial List page and date search I show ony the first five fields, you
                 // may need to adjust in your own app.
                 if (iCounter < 7) {
@@ -317,6 +329,7 @@
         rawtemplate = rawtemplate.Replace("@@SQLSELECTONE", sqlselectone);
         rawtemplate = rawtemplate.Replace("@@SQLDELETE", sqldelete);
         rawtemplate = rawtemplate.Replace("@@SQLDATERANGE", sqldaterange + sqlDateSearchWhereClause);
+        rawtemplate = rawtemplate.Replace("@@TABLENAME",tablename);
         return fieldlist;
     }
 
